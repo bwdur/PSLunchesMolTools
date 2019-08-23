@@ -13,8 +13,8 @@ function Set-TMServiceLogon {
         [string] $ErrorLogFilePath
     )
 
-    begin { }
-    process {
+    BEGIN { }
+    PROCESS {
         $query = "Select * from win32_service where name = '$ServiceName'"
 
         foreach ($computer in $ComputerName) {
@@ -29,11 +29,32 @@ function Set-TMServiceLogon {
                 $args = @{'StartPassword' = $NewPassword }
             }
 
-            Invoke-CimMethod -ComputerName $computer -MethodName Change -Query "SELECT * FROM Win32_Service WHERE Name = '$ServiceName'" -Arguments $args | 
-            Select-Object -Property @{n = 'ComputerName'; e = { $computer } }, @{n = 'Result'; e = { $_.ReturnValue } }
+            # SPLATTING example
+            
+            $params = @{'CimSession' = $session
+                        'MethodName' = 'Change'
+                        'Query' = "Select * from win32_service where name = '$ServiceName'"
+                        'Arguments' = $args}
+
+            $status = Invoke-CimMethod @params
+            
+            switch ($status.ReturnValue){
+                0 {$result = "Success"}
+                22 {$result = "Invalid Account"}
+                Default{
+                    $result = "Failed: " + $status.ReturnValue
+                }
+            }
+
+            $obj = [PSCustomObject]@{
+                ComputerName = $computer
+                Result = $result
+            }
+
+            $obj
 
             $session | Remove-CimSession
-        }
-        end { }
-    }
+        } 
+    } #process
+    END { }
 }
