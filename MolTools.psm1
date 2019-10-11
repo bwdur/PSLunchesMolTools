@@ -6,20 +6,21 @@ function Set-TMServiceLogon {
         [string] $ServiceName,
         [parameter(ValueFromPipelineByPropertyName)]
         [string] $NewUser,
-        [parameter(ValueFromPipelineByPropertyName, Mandatory = $True)]
+        [parameter(ValueFromPipelineByPropertyName)]
         [string] $NewPassword,
         [parameter(ValueFromPipeline, ValueFromPipelineByPropertyName, Mandatory = $True)]
         [string[]] $ComputerName,
         [string] $ErrorLogFilePath
     )
 
-    BEGIN { }
+    BEGIN {
+        Write-Verbose "[BEGIN ] Starting $($MyInvocation.MyCommand)..."
+     }
     PROCESS {
-        $query = "Select * from win32_service where name = '$ServiceName'"
-
         foreach ($computer in $ComputerName) {
-
+            
             $option = New-CimSessionOption -protocol Wsman
+            Write-Verbose "[PROCESS ] Connecting to $computer on WS-MAN protocol"
             $session = New-CimSession -SessionOption $option -ComputerName $computer
 
             if ($PSBoundParameters.ContainsKey('NewUser')) {
@@ -27,6 +28,7 @@ function Set-TMServiceLogon {
             }
             else {
                 $args = @{'StartPassword' = $NewPassword }
+                Write-Warning "Not setting a new user name"
             }
 
             # SPLATTING example
@@ -36,6 +38,7 @@ function Set-TMServiceLogon {
                         'Query' = "Select * from win32_service where name = '$ServiceName'"
                         'Arguments' = $args}
 
+             Write-Verbose "[PROCESS ] Setting $servicename on $computer"
             $status = Invoke-CimMethod @params
             
             switch ($status.ReturnValue){
@@ -46,13 +49,14 @@ function Set-TMServiceLogon {
                 }
             }
 
+            Write-Verbose "[PROCESS ] Result for $computer - $result"
             $obj = [PSCustomObject]@{
                 ComputerName = $computer
                 Result = $result
             }
 
             $obj
-
+            write-verbose "Closing connection to $computer"
             $session | Remove-CimSession
         } 
     } #process
